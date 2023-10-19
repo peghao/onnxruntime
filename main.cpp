@@ -2,8 +2,16 @@
 
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #include "include/onnx.proto3.pb.h"
+
+enum ErrorCode
+{
+    PASE_PROTO_FILE_ERROR,
+};
+
+const std::map<ErrorCode, std::string> ERROR_MESSAGE = {{ErrorCode::PASE_PROTO_FILE_ERROR, "parsing model failed!"}};
 
 void read_proto(std::string model_path, onnx::ModelProto &model)
 {
@@ -17,6 +25,15 @@ void read_proto(std::string model_path, onnx::ModelProto &model)
     model_file.close();
 }
 
+uint64_t get_tensor_size(const onnx::TensorProto &X)
+{
+    int dim_size = X.dims_size();
+    uint64_t tensor_size = 1;
+    for(int i=0; i<dim_size; i++)
+        tensor_size *= X.dims(i);
+    return tensor_size;
+}
+
 int main(int argc, char **argv)
 {
     if(argc != 2)
@@ -26,12 +43,27 @@ int main(int argc, char **argv)
     }
     onnx::ModelProto model{};
     read_proto(std::string(argv[1]), model);
-    int num_node = model.graph().node_size();
-    std::cout << "graph node size: " << num_node << std::endl;
+
+    int num_node = model.graph().node_size(); // 计算图中所包含的节点数量
+    std::cout << "info: num nodes: " << num_node << std::endl;
 
     for(int i=0; i<num_node; i++)
     {
-        std::cout << "node: " << i << ", name: " << model.graph().node(i).name() << std::endl;
+        std::cout << "info: " << "node: " << i << ", name: " << model.graph().node(i).name() << std::endl;
+        int num_input = model.graph().node(i).input_size();
+        for(int j=0; j<num_input; j++)
+        {
+            auto node_input = model.graph().node(i).input(j);
+            std::cout << "input name: " << j << ", name: " << node_input << std::endl;
+        }
     }
 
+    int num_tensor = model.graph().initializer_size();
+    for(int i=0; i<num_tensor; i++)
+    {
+        uint64_t tensor_size = get_tensor_size(model.graph().initializer(i));
+        std::string tensor_name = model.graph().initializer(i).name();
+        int32_t data_type = model.graph().initializer(i).data_type();
+        std::cout << "tensor: " << i << ", tensor_name: " << tensor_name << ", tensor_size: " << tensor_size << ", data_type:" << data_type << std::endl;
+    }
 }
